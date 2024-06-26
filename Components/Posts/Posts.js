@@ -7,6 +7,7 @@ import Navigation from '../Navigation/Navigation';
 import { getDownloadURL, getStorage, listAll, ref } from 'firebase/storage';
 import { app } from '../../firebase/firebase';
 import { getVideoList, setPosts } from '../../redux/slice/postsSlice';
+import { getAuth } from 'firebase/auth';
 
 const { height } = Dimensions.get('window');
 
@@ -20,6 +21,8 @@ export default function Posts() {
 
   const posts = useSelector((state) => state.posts.posts);
 
+  const auth = getAuth();
+
   const togglePlayPause = () => {
     setIsPlaying((prevState) => !prevState);
   };
@@ -32,7 +35,7 @@ export default function Posts() {
     <View style={styles.postBody}>
       <TouchableOpacity onPress={togglePlayPause}>
         <Video
-          source={{ uri: item }}
+          source={{ uri: item.url }}
           resizeMode="cover"
           shouldPlay={isPlaying && activeIndex === index}
           isLooping
@@ -42,7 +45,7 @@ export default function Posts() {
       <View style={styles.postButton}>
         <ButtonNavigation
           iconSource={require('../../assets/icons/like.png')}
-          title={`${item.likeCount}`}
+          title={`${item.likes}`}
         />
       </View>
       <Text style={styles.postTitle}>{item.title}</Text>
@@ -52,7 +55,7 @@ export default function Posts() {
 
   return (
     <View style={{ position: 'relative' }}>
-      {posts && posts.length > 0 && (
+      {posts.length > 0 && (
         <FlatList
           data={posts}
           renderItem={({ item, index }) => renderItem({ item, index })}
