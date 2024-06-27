@@ -13,13 +13,11 @@ const { height } = Dimensions.get('window');
 
 const storage = getStorage(app);
 
-export default function Posts() {
+export default function Posts({ posts }) {
   const [activeIndex, setActiveIndex] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
   const dispatch = useDispatch();
-
-  const posts = useSelector((state) => state.posts.posts);
 
   const auth = getAuth();
 
@@ -50,6 +48,9 @@ export default function Posts() {
       </View>
       <Text style={styles.postTitle}>{item.title}</Text>
       <Text style={styles.postDescription}>{item.description}</Text>
+      <Text style={styles.postTags}>
+        {item.tags && item.tags.length > 0 ? `#${item.tags.join(' #')}` : ''}
+      </Text>
     </View>
   );
 
@@ -102,5 +103,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 15,
     bottom: 400,
+  },
+  postTags: {
+    color: '#fff',
+    position: 'absolute',
+    left: 15,
+    bottom: 100,
   },
 });

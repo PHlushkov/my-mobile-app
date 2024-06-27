@@ -30,64 +30,55 @@ export const getVideoList = createAsyncThunk('posts/getVideoList', async (_, { d
   }
 });
 
-export const uploadVideo = createAsyncThunk('posts/uploadVideo', async (uri) => {
-  try {
-    const response = await FileSystem.readAsStringAsync(uri, {
-      encoding: 'base64',
-    });
+export const uploadVideo = createAsyncThunk(
+  'posts/uploadVideo',
+  async ({ uri, title, description, tags, userId }, { rejectWithValue }) => {
+    try {
+      const response = await fetch(uri);
+      if (!response.ok) {
+        throw new Error(`Network response was not ok: ${response.statusText}`);
+      }
+      const blob = await response.blob();
 
-    const byteCharacters = atob(response);
-    const byteNumbers = new Array(byteCharacters.length);
+      const videoName = `${Date.now()}.mp4`;
+      const storageRef = ref(storage, `video/${videoName}`);
 
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
+      const uploadTask = uploadBytesResumable(storageRef, blob);
+
+      return new Promise((resolve, reject) => {
+        uploadTask.on(
+          'state_changed',
+          null,
+          (error) => {
+            console.error('Upload error:', error);
+            rejectWithValue(error);
+          },
+          async () => {
+            try {
+              const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+              await addDoc(collection(db, 'videos'), {
+                name: videoName,
+                title,
+                description,
+                tags: tags.split(',').map((tag) => tag.trim()),
+                userId,
+                url: downloadURL,
+                likes: 0,
+              });
+              resolve(downloadURL);
+            } catch (error) {
+              console.error('Error setting video document:', error);
+              rejectWithValue(error);
+            }
+          },
+        );
+      });
+    } catch (error) {
+      console.error('Error uploading video:', error);
+      return rejectWithValue(error);
     }
-
-    const fileUrl = await fetch(uri);
-    const blob = await fileUrl.blob();
-
-    const videoName = `${Date.now()}.mp4`;
-    const storageRef = ref(storage, `video/${videoName}`);
-
-    const uploadTask = uploadBytesResumable(storageRef, blob);
-
-    return new Promise((resolve, reject) => {
-      uploadTask.on(
-        'state_changed',
-        null,
-        (error) => {
-          console.error('Upload error:', error);
-          reject(error);
-        },
-        async () => {
-          try {
-            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-            const docRef = await addDoc(collection(db, 'videos'), {
-              name: videoName,
-              title: 'New Video',
-              description: 'This is a description',
-              likes: 0,
-              url: downloadURL,
-            });
-            resolve({
-              name: videoName,
-              title: 'New Video',
-              description: 'This is a description',
-              likes: 0,
-              url: downloadURL,
-            });
-          } catch (error) {
-            console.error('Error setting video document:', error);
-            reject(error);
-          }
-        },
-      );
-    });
-  } catch (error) {
-    console.error('Error uploading video:', error);
-    throw error;
-  }
-});
+  },
+);
 
 const initialState = {
   posts: [],
@@ -102,6 +93,5 @@ export const postsSlice = createSlice({
     },
   },
 });
-
 export const { setPosts } = postsSlice.actions;
 export default postsSlice.reducer;
