@@ -1,17 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { Dimensions, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Dimensions,
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Video } from 'expo-av';
-import { useDispatch, useSelector } from 'react-redux';
-import ButtonNavigation from '../../UiComponents/ButtonNavigation/ButtonNavigation';
+import { useDispatch } from 'react-redux';
 import Navigation from '../Navigation/Navigation';
-import { getDownloadURL, getStorage, listAll, ref } from 'firebase/storage';
+import { getStorage } from 'firebase/storage';
 import { app } from '../../firebase/firebase';
-import { getVideoList, setPosts } from '../../redux/slice/postsSlice';
+import { getVideoList, toggleLike } from '../../redux/slice/postsSlice';
 import { getAuth } from 'firebase/auth';
 
 const { height } = Dimensions.get('window');
-
-const storage = getStorage(app);
 
 export default function Posts({ posts }) {
   const [activeIndex, setActiveIndex] = useState(null);
@@ -20,6 +25,7 @@ export default function Posts({ posts }) {
   const dispatch = useDispatch();
 
   const auth = getAuth();
+  const userId = auth.currentUser ? auth.currentUser.uid : null;
 
   const togglePlayPause = () => {
     setIsPlaying((prevState) => !prevState);
@@ -29,30 +35,50 @@ export default function Posts({ posts }) {
     dispatch(getVideoList());
   }, []);
 
-  const renderItem = ({ item, index }) => (
-    <View style={styles.postBody}>
-      <TouchableOpacity onPress={togglePlayPause}>
-        <Video
-          source={{ uri: item.url }}
-          resizeMode="cover"
-          shouldPlay={isPlaying && activeIndex === index}
-          isLooping
-          style={{ height: height, width: '100%' }}
-        />
-      </TouchableOpacity>
-      <View style={styles.postButton}>
-        <ButtonNavigation
-          iconSource={require('../../assets/icons/like.png')}
-          title={`${item.likes}`}
-        />
+  const handleToggleLike = (postId, liked) => {
+    if (userId) {
+      dispatch(toggleLike({ postId, userId, liked }));
+    } else {
+      alert('Please sign in to like the post.');
+    }
+  };
+
+  const renderItem = ({ item, index }) => {
+    const likes = item.likes || [];
+    const liked = likes.includes(userId);
+
+    return (
+      <View style={styles.postBody}>
+        <TouchableOpacity onPress={togglePlayPause}>
+          <Video
+            source={{ uri: item.url }}
+            resizeMode="cover"
+            shouldPlay={isPlaying && activeIndex === index}
+            isLooping
+            style={{ height: height, width: '100%' }}
+          />
+        </TouchableOpacity>
+        <View style={styles.postButton}>
+          <TouchableOpacity onPress={() => handleToggleLike(item.id, liked)}>
+            <Image
+              style={styles.likeIcon}
+              source={
+                liked
+                  ? require('../../assets/icons/like-filled.png')
+                  : require('../../assets/icons/like.png')
+              }
+            />
+          </TouchableOpacity>
+          <Text style={styles.likeCount}>{likes.length}</Text>
+        </View>
+        <Text style={styles.postTitle}>{item.title}</Text>
+        <Text style={styles.postDescription}>{item.description}</Text>
+        <Text style={styles.postTags}>
+          {item.tags && item.tags.length > 0 ? `#${item.tags.join(' #')}` : ''}
+        </Text>
       </View>
-      <Text style={styles.postTitle}>{item.title}</Text>
-      <Text style={styles.postDescription}>{item.description}</Text>
-      <Text style={styles.postTags}>
-        {item.tags && item.tags.length > 0 ? `#${item.tags.join(' #')}` : ''}
-      </Text>
-    </View>
-  );
+    );
+  };
 
   return (
     <View style={{ position: 'relative' }}>
@@ -103,6 +129,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 15,
     bottom: 400,
+  },
+  likeIcon: {
+    width: 35,
+    height: 35,
+  },
+  likeCount: {
+    textAlign: 'center',
+    color: '#fff',
   },
   postTags: {
     color: '#fff',

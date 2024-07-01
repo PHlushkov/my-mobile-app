@@ -1,8 +1,15 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { app } from '../../firebase/firebase';
 import { getStorage, ref, getDownloadURL, uploadBytesResumable, listAll } from 'firebase/storage';
-import * as FileSystem from 'expo-file-system';
-import { addDoc, collection, getDocs, getFirestore } from 'firebase/firestore';
+import {
+  addDoc,
+  collection,
+  getDocs,
+  getFirestore,
+  updateDoc,
+  doc,
+  getDoc,
+} from 'firebase/firestore';
 
 const storage = getStorage(app);
 const db = getFirestore();
@@ -19,6 +26,7 @@ export const getVideoList = createAsyncThunk('posts/getVideoList', async (_, { d
         const url = await getDownloadURL(videoRef);
         return {
           ...data,
+          id: doc.id,
           url,
         };
       }),
@@ -63,7 +71,7 @@ export const uploadVideo = createAsyncThunk(
                 tags: tags.split(',').map((tag) => tag.trim()),
                 userId,
                 url: downloadURL,
-                likes: 0,
+                likes: [],
               });
               resolve(downloadURL);
             } catch (error) {
@@ -80,6 +88,31 @@ export const uploadVideo = createAsyncThunk(
   },
 );
 
+export const toggleLike = createAsyncThunk(
+  'posts/toggleLike',
+  async ({ postId, userId, liked }, { rejectWithValue }) => {
+    try {
+      const postRef = doc(db, 'videos', postId);
+      const postSnapshot = await getDoc(postRef);
+      const postData = postSnapshot.data();
+
+      let updatedLikes;
+      if (liked) {
+        updatedLikes = postData.likes.filter((id) => id !== userId);
+      } else {
+        updatedLikes = [...postData.likes, userId];
+      }
+
+      await updateDoc(postRef, { likes: updatedLikes });
+
+      return { postId, updatedLikes };
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      return rejectWithValue(error);
+    }
+  },
+);
+
 const initialState = {
   posts: [],
 };
@@ -91,6 +124,15 @@ export const postsSlice = createSlice({
     setPosts: (state, { payload }) => {
       state.posts = payload;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(toggleLike.fulfilled, (state, { payload }) => {
+      const { postId, updatedLikes } = payload;
+      const postIndex = state.posts.findIndex((post) => post.id === postId);
+      if (postIndex !== -1) {
+        state.posts[postIndex].likes = updatedLikes;
+      }
+    });
   },
 });
 export const { setPosts } = postsSlice.actions;
