@@ -10,6 +10,9 @@ import {
 import { app } from '../firebase/firebase';
 import Navigation from '../Components/Navigation/Navigation';
 import { useNavigation } from '@react-navigation/native';
+import { doc, getFirestore, setDoc } from 'firebase/firestore';
+import { useDispatch } from 'react-redux';
+import { getVideoList, resetUserData } from '../redux/slice/postsSlice';
 
 const AuthScreen = ({
   email,
@@ -65,11 +68,14 @@ const AuthenticatedScreen = ({ user, handleAuthentication }) => {
   );
 };
 export default AuthorizationScreen = () => {
+  const dispatch = useDispatch();
   const naviagation = useNavigation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [user, setUser] = useState(null);
   const [isLogin, setIsLogin] = useState(true);
+
+  const db = getFirestore(app);
 
   const auth = getAuth(app);
   useEffect(() => {
@@ -85,15 +91,25 @@ export default AuthorizationScreen = () => {
       if (user) {
         await signOut(auth);
         console.log('User logged out successfully!');
+        dispatch(getVideoList());
+        dispatch(resetUserData());
         naviagation.navigate('HomeScreen');
       } else {
         if (isLogin) {
           await signInWithEmailAndPassword(auth, email, password);
           console.log('User signed in successfully!');
+          dispatch(getVideoList());
           naviagation.navigate('HomeScreen');
         } else {
-          await createUserWithEmailAndPassword(auth, email, password);
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
           console.log('User created successfully!');
+
+          await setDoc(doc(db, 'users', userCredential.user.uid), {
+            email: userCredential.user.email,
+            likedPosts: [],
+            uid: userCredential.user.uid,
+          });
+          dispatch(getVideoList());
           naviagation.navigate('HomeScreen');
         }
       }

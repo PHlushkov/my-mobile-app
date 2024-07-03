@@ -18,7 +18,7 @@ import { getAuth } from 'firebase/auth';
 
 const { height } = Dimensions.get('window');
 
-export default function Posts({ posts }) {
+export default function Posts({ posts, onLike }) {
   const [activeIndex, setActiveIndex] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -59,7 +59,7 @@ export default function Posts({ posts }) {
           />
         </TouchableOpacity>
         <View style={styles.postButton}>
-          <TouchableOpacity onPress={() => handleToggleLike(item.id, liked)}>
+          <TouchableOpacity onPress={() => onLike(item.id, liked)}>
             <Image
               style={styles.likeIcon}
               source={

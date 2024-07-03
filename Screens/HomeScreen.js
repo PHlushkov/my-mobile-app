@@ -9,26 +9,59 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import Posts from '../Components/Posts/Posts';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { getUserData, getVideoList, resetUserData, toggleLike } from '../redux/slice/postsSlice';
 
 export default function HomeScreen() {
   const posts = useSelector((state) => state.posts.posts);
-
+  const user = useSelector((state) => state.posts.user);
+  const [filteredPosts, setFilteredPosts] = useState([]);
   const [inputVisible, setInputVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredPosts, setFilteredPosts] = useState(posts);
+  const dispatch = useDispatch();
+
+  const auth = getAuth();
+  const currentUser = auth.currentUser;
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        dispatch(getUserData(user.uid));
+      } else {
+        dispatch(resetUserData());
+      }
+      dispatch(getVideoList());
+    });
+
+    return () => unsubscribe();
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (user) {
+      const filteredByLikes = posts.filter((post) => !user.likedPosts.includes(post.name));
+      setFilteredPosts(filteredByLikes);
+    } else {
+      setFilteredPosts(posts);
+    }
+  }, [user, posts]);
 
   useEffect(() => {
     if (searchQuery === '') {
-      setFilteredPosts(posts);
+      if (user) {
+        const filteredByLikes = posts.filter((post) => !user.likedPosts.includes(post.name));
+        setFilteredPosts(filteredByLikes);
+      } else {
+        setFilteredPosts(posts);
+      }
     } else {
       const lowercasedQuery = searchQuery.toLowerCase();
-      const filtered = posts.filter((post) =>
-        post.tags.some((tags) => tags.toLowerCase().includes(lowercasedQuery)),
+      const updatedPosts = filteredPosts.filter((post) =>
+        post.tags.some((tag) => tag.toLowerCase().includes(lowercasedQuery)),
       );
-      setFilteredPosts(filtered);
+      setFilteredPosts(updatedPosts);
     }
-  }, [searchQuery, posts]);
+  }, [searchQuery, user, posts]);
 
   const toggleInput = () => {
     setInputVisible((prev) => !prev);
@@ -40,10 +73,19 @@ export default function HomeScreen() {
     setSearchQuery('');
   };
 
+  const handleLike = (postId, liked) => {
+    if (currentUser) {
+      dispatch(toggleLike({ postId, userId: currentUser.uid, liked }));
+      // Delay the update of filteredPosts until re-fetching user data
+    } else {
+      alert('Please sign in to like the post.');
+    }
+  };
+
   return (
     <TouchableWithoutFeedback onPress={hideInput}>
       <View style={styles.appBody}>
-        <Posts posts={filteredPosts} />
+        <Posts posts={filteredPosts} onLike={handleLike} />
         <TouchableOpacity style={styles.searchBtn} onPress={toggleInput}>
           <Image style={styles.img} source={require('../assets/icons/search.png')} />
         </TouchableOpacity>
